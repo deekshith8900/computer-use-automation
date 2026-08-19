@@ -12,7 +12,10 @@ from agent.replay import (
     BusinessOutcomeError,
     HardFailureError,
 )
-from agent.artifact import Artifact, Step, Locator, Checkpoint, ArtifactSafety
+from agent.artifact import (
+    Artifact, ArtifactParam, ArtifactOutput, Step, Locator, Checkpoint, ArtifactSafety
+)
+
 
 
 class TestSubstituteParams:
@@ -102,9 +105,9 @@ class TestArtifactForReplay:
     def make_artifact_with_checkpoint(self) -> Artifact:
         return Artifact(
             goal="Find member and get balance",
-            base_url="http://localhost:5000",
+            base_url="http://localhost:5001",
             steps=[
-                Step(seq=1, action="navigate", url="http://localhost:5000/members"),
+                Step(seq=1, action="navigate", url="http://localhost:5001/members"),
                 Step(
                     seq=2,
                     action="fill",
@@ -129,8 +132,8 @@ class TestArtifactForReplay:
                     output_key="account_balance",
                 ),
             ],
-            params={"member_name": "string"},
-            outputs=["account_balance"],
+            param_defs=[ArtifactParam(name="member_name", type="string")],
+            output_defs=[ArtifactOutput(key="account_balance", type="string")],
         )
 
     def test_artifact_has_params(self):

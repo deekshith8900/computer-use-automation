@@ -1,0 +1,13 @@
+{
+  "id": "9a2353d0-61c2-4996-8320-19ce19a94439",
+  "run_id": "c9e6ff9f-5701-439d-9c5b-0ef0c7f530fa",
+  "artifact_goal": "Find member {{member_name}} and return their account balance",
+  "current_step_seq": 5,
+  "current_url": "http://localhost:5001/members",
+  "reason": "Step 5 (click) failed after 2 retries: No locator resolved for {'strategy': 'css', 'value': '.THIS_ELEMENT_DOES_NOT_EXIST_HITL_DEMO'}. Last error: Locator.wait_for: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\".THIS_ELEMENT_DOES_NOT_EXIST_HITL_DEMO\").first\n",
+  "screenshot_path": "evidence/escalation_step5_c9e6ff9f_205756.png",
+  "created_at": "2026-08-19T20:57:56.359948+00:00",
+  "status": "resolved",
+  "human_notes": "Auto-resolved by demo script. Human navigated to /members/M001 directly.",
+  "resolved_at": "2026-08-19T20:58:02.870002+00:00"
+}

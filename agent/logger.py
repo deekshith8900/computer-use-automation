@@ -118,25 +118,27 @@ class RunLogger:
         })
         console.print(f"  [dim cyan]LLM[/dim cyan] {model} → tools: {tool_calls}")
 
-    def escalation(self, reason: str, step_seq: int, intervention_id: str) -> None:
+    def escalation(self, step_seq: int, reason: str, screenshot_path: str = "") -> None:
         self._write({
             "event": "escalation",
-            "reason": reason,
             "step_seq": step_seq,
-            "intervention_id": intervention_id,
+            "reason": reason,
+            "screenshot": screenshot_path,
             "elapsed_s": self._elapsed(),
             "timestamp": self._now(),
         })
-        console.print(f"  [bold yellow]⚑ ESCALATION[/bold yellow] — {reason}")
+        console.print(f"  [bold yellow]⚑ ESCALATION[/bold yellow] step {step_seq} — {reason}")
 
-    def human_resumed(self, intervention_id: str) -> None:
+    def human_resumed(self, step_seq: int, notes: str = "") -> None:
         self._write({
             "event": "human_resumed",
-            "intervention_id": intervention_id,
+            "step_seq": step_seq,
+            "notes": notes,
             "elapsed_s": self._elapsed(),
             "timestamp": self._now(),
         })
-        console.print(f"  [bold green]↩ RESUMED[/bold green] by human (intervention {intervention_id[:8]})")
+        console.print(f"  [bold green]↩ RESUMED[/bold green] by human at step {step_seq}" +
+                      (f" — {notes}" if notes else ""))
 
     def business_outcome(self, signal: str, step_seq: int) -> None:
         self._write({

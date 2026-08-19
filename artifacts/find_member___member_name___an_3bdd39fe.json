@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.1",
+  "id": "3bdd39fe-5940-4829-83a2-9f2e56516807",
+  "created_at": "2026-08-19T20:57:21.428862+00:00",
+  "goal": "Find member {{member_name}} and return their account balance",
+  "surface": "web",
+  "base_url": "http://localhost:5001",
+  "discovery_model": "hand-crafted",
+  "param_defs": [
+    {
+      "name": "member_name",
+      "type": "string",
+      "required": true,
+      "description": "Full or partial name of the bank member to look up"
+    }
+  ],
+  "output_defs": [
+    {
+      "key": "account_balance",
+      "type": "string",
+      "description": "Total account balance shown on the member detail page"
+    }
+  ],
+  "steps": [
+    {
+      "seq": 1,
+      "action": "navigate",
+      "url": "http://localhost:5001",
+      "description": "Initial navigation to base URL"
+    },
+    {
+      "seq": 2,
+      "action": "navigate",
+      "url": "http://localhost:5001/members",
+      "checkpoint": {
+        "type": "url_contains",
+        "value": "/members"
+      },
+      "description": "Navigate to member search page"
+    },
+    {
+      "seq": 3,
+      "action": "fill",
+      "locator": {
+        "strategy": "data-testid",
+        "value": "search-input",
+        "fallbacks": [
+          {
+            "strategy": "css",
+            "value": "input[name='query']"
+          },
+          {
+            "strategy": "css",
+            "value": "input[type='text']"
+          }
+        ]
+      },
+      "value": "{{member_name}}",
+      "description": "Fill member name into search field [param:member_name]"
+    },
+    {
+      "seq": 4,
+      "action": "click",
+      "locator": {
+        "strategy": "data-testid",
+        "value": "search-button",
+        "fallbacks": [
+          {
+            "strategy": "text",
+            "value": "Search"
+          },
+          {
+            "strategy": "css",
+            "value": "button[type='submit']"
+          }
+        ]
+      },
+      "checkpoint": {
+        "type": "url_contains",
+        "value": "/members"
+      },
+      "description": "Click Search button to submit the form",
+      "on_not_found": "business_outcome",
+      "business_outcome_signal": "no results"
+    },
+    {
+      "seq": 5,
+      "action": "click",
+      "locator": {
+        "strategy": "css",
+        "value": "a[data-testid^='view-member']",
+        "fallbacks": [
+          {
+            "strategy": "text",
+            "value": "View Details"
+          },
+          {
+            "strategy": "css",
+            "value": "a.btn-primary"
+          }
+        ]
+      },
+      "checkpoint": {
+        "type": "url_contains",
+        "value": "/members/"
+      },
+      "description": "Click View Details for the first search result",
+      "on_not_found": "business_outcome",
+      "business_outcome_signal": "No members found"
+    },
+    {
+      "seq": 6,
+      "action": "extract",
+      "locator": {
+        "strategy": "data-testid",
+        "value": "total-balance",
+        "fallbacks": [
+          {
+            "strategy": "css",
+            "value": ".total-balance strong"
+          },
+          {
+            "strategy": "css",
+            "value": "[data-testid='total-balance']"
+          }
+        ]
+      },
+      "output_key": "account_balance",
+      "description": "Extract total balance from member detail page"
+    }
+  ],
+  "safety": {
+    "allowed_domains": [
+      "localhost:5001"
+    ],
+    "reversibility": "read-only",
+    "requires_confirmation": false
+  }
+}

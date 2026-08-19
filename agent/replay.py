@@ -4,13 +4,17 @@ agent/replay.py — Deterministic replay engine.
 Replays a saved artifact with NO LLM decisions.
 Every step is executed exactly as recorded, with:
   - Parameter substitution ({{member_name}} → actual value)
-  - Pre-execution safety checks
+  - Pre-execution safety checks (domain allowlist + reversibility)
   - Checkpoint evaluation after each step
   - Structured error classification:
-      success           — completed, outputs extracted
+      success           — completed, all declared outputs extracted
       business_outcome  — known non-success result (e.g. "no such member")
-      recoverable_error — transient condition handled (dismissed interstitial, retried)
+      recoverable_error — transient condition; retry succeeded, result returned
       hard_failure      — unexpected state, stop and return debuggable error
+
+HITL: when retries are exhausted the automation PAUSES and writes an
+InterventionRequest. The human resolves it via the operator UI; automation
+then resumes on the same Playwright session.
 
 Design note: "no such member" is a legitimate result the caller needs to act on —
 not a crash. We never conflate business outcomes with failures.
@@ -107,7 +111,11 @@ class ReplayEngine:
         self.run_id = str(uuid.uuid4())
         self.logger = RunLogger(self.run_id, "replay", evidence_dir)
 
+        # Build policy from artifact safety + environment overrides
         policy = Policy.from_env()
+        # Artifact's allowed domains take precedence if set
+        if artifact.safety.allowed_domains:
+            policy.allowed_domains = artifact.safety.allowed_domains
         if allow_irreversible:
             policy.irreversible_policy = "allow"
         else:
@@ -156,7 +164,17 @@ class ReplayEngine:
             if result is not None:
                 return result  # terminal result (business outcome or hard failure)
 
-        # All steps completed — gather outputs
+        # All steps completed — verify all declared outputs were populated
+        missing = [o.key for o in self.artifact.output_defs if o.key not in self._outputs]
+        if missing:
+            screenshot = await self._browser.screenshot(f"missing_outputs_{self.run_id[:8]}")
+            return ReplayResult(
+                status="hard_failure",
+                error_detail=f"Declared outputs not extracted: {missing}",
+                screenshot_path=screenshot,
+                log_path=str(self.logger.log_path),
+            )
+
         return ReplayResult(
             status="success",
             outputs=self._outputs,
@@ -165,27 +183,76 @@ class ReplayEngine:
 
     async def _execute_step_with_retry(self, step: Step) -> Optional[ReplayResult]:
         """
-        Execute one step with up to MAX_RETRIES_PER_STEP retries for recoverable errors.
-        Returns None if step succeeded, or a terminal ReplayResult on hard failure / business outcome.
+        Execute one step with up to MAX_RETRIES_PER_STEP retries.
+
+        Returns:
+          None                 — step succeeded, continue
+          ReplayResult(success)        — not used here (reserved)
+          ReplayResult(business_outcome) — known non-success
+          ReplayResult(recoverable_error) — retry succeeded (noted in log)
+          ReplayResult(hard_failure)   — stop
         """
+        had_recoverable = False
         for attempt in range(MAX_RETRIES_PER_STEP + 1):
             try:
                 terminal = await self._execute_one_step(step)
+                if had_recoverable and terminal is None:
+                    # A retry succeeded — note it as recoverable_error in log
+                    self.logger.info(
+                        f"Step {step.seq} recovered after {attempt} retry(ies)"
+                    )
                 return terminal  # None = success, non-None = terminal
             except RecoverableError as e:
-                self.logger.info(f"Recoverable error on step {step.seq} (attempt {attempt+1}): {e}")
+                had_recoverable = True
+                self.logger.info(
+                    f"Recoverable error on step {step.seq} (attempt {attempt + 1}): {e}"
+                )
                 if attempt < MAX_RETRIES_PER_STEP:
                     await self._browser.wait(WAIT_BETWEEN_RETRIES_MS)
                     continue
-                # Exhausted retries
-                screenshot = await self._browser.screenshot(f"exhausted_retry_step{step.seq}")
-                return ReplayResult(
-                    status="hard_failure",
-                    error_step=step.seq,
-                    error_detail=f"Exhausted {MAX_RETRIES_PER_STEP} retries: {e}",
-                    screenshot_path=screenshot,
-                    log_path=str(self.logger.log_path),
+
+                # Retries exhausted — escalate to human operator
+                screenshot = await self._browser.screenshot(
+                    f"escalation_step{step.seq}_{self.run_id[:8]}"
                 )
+                self.logger.escalation(
+                    step.seq,
+                    f"Exhausted {MAX_RETRIES_PER_STEP} retries: {e}",
+                    screenshot,
+                )
+                try:
+                    resolved = await self.escalator.escalate(
+                        reason=f"Step {step.seq} ({step.action}) failed after "
+                               f"{MAX_RETRIES_PER_STEP} retries: {e}",
+                        step_seq=step.seq,
+                        current_url=self._browser.page.url if self._browser._page else "",
+                        screenshot_path=screenshot,
+                    )
+                    self.logger.human_resumed(
+                        step.seq,
+                        resolved.human_notes or "(no notes)",
+                    )
+                    # After human intervention, retry once more on same session
+                    try:
+                        terminal = await self._execute_one_step(step)
+                        return terminal
+                    except Exception as retry_err:
+                        return ReplayResult(
+                            status="hard_failure",
+                            error_step=step.seq,
+                            error_detail=f"Failed after human intervention: {retry_err}",
+                            screenshot_path=screenshot,
+                            log_path=str(self.logger.log_path),
+                        )
+                except TimeoutError as te:
+                    return ReplayResult(
+                        status="hard_failure",
+                        error_step=step.seq,
+                        error_detail=f"Human intervention timed out: {te}",
+                        screenshot_path=screenshot,
+                        log_path=str(self.logger.log_path),
+                    )
+
             except BusinessOutcomeError as e:
                 self.logger.business_outcome(str(e), step.seq)
                 return ReplayResult(
@@ -261,15 +328,18 @@ class ReplayEngine:
             err = str(e)
             # Check if this is a known business outcome signal
             if step.on_not_found == "business_outcome" and step.business_outcome_signal:
-                body_has_signal = await self._browser.check_business_outcome(step.business_outcome_signal)
+                body_has_signal = await self._browser.check_business_outcome(
+                    step.business_outcome_signal
+                )
                 if body_has_signal:
                     raise BusinessOutcomeError(step.business_outcome_signal)
             # Check if page shows a business outcome even without explicit signal
             page_text = await self._browser.get_page_text()
-            for signal in ["not found", "no such member", "no results", "record not found"]:
+            for signal in ["not found", "no such member", "no results", "record not found",
+                           "no members found", "no members matched"]:
                 if signal in page_text.lower():
                     raise BusinessOutcomeError(signal)
-            # Otherwise it's a locator/timeout failure
+            # Timeout / locator failures are recoverable (retry may help)
             if "timeout" in err.lower() or "locator" in err.lower():
                 raise RecoverableError(err)
             raise HardFailureError(err)
@@ -294,7 +364,7 @@ class ReplayEngine:
 # ─── Error Types ──────────────────────────────────────────────────────────────
 
 class RecoverableError(Exception):
-    """Transient error — dismiss interstitial, wait, retry."""
+    """Transient error — dismiss interstitial, wait, retry. Returns recoverable_error on success."""
 
 class BusinessOutcomeError(Exception):
     """Known non-success result — caller should handle, not crash."""

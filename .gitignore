@@ -19,10 +19,6 @@ env/
 .DS_Store
 **/.DS_Store
 
-# Evidence / run outputs (large, run-specific)
-evidence/*.log
-evidence/*.png
-
 # Browser / Playwright cache
 *.har
 

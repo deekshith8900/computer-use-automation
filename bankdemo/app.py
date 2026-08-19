@@ -138,6 +138,8 @@ def transfer():
                 error = f"Source account '{from_account}' not found."
             elif to_account not in ACCOUNTS:
                 error = f"Destination account '{to_account}' not found."
+            elif from_account == to_account:
+                error = "Cannot transfer to the same account."
             else:
                 try:
                     amount = float(amount_str)
@@ -162,7 +164,7 @@ def transfer():
             to_id = request.form.get("to_account_id", "")
             amount = float(request.form.get("amount", 0))
 
-            if from_id in ACCOUNTS and to_id in ACCOUNTS:
+            if from_id in ACCOUNTS and to_id in ACCOUNTS and from_id != to_id:
                 if ACCOUNTS[from_id]["balance"] >= amount:
                     ACCOUNTS[from_id]["balance"] -= amount
                     ACCOUNTS[to_id]["balance"] += amount

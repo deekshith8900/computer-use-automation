@@ -1,3 +1,0 @@
-# Artifacts are generated at runtime — not committed
-# Add specific .json files manually if you want to include them
-*.json

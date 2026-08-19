@@ -256,6 +256,29 @@ IMPORTANT: You are recording steps to be replayed deterministically. Choose acti
 MAX_STEPS = 30  # Hard limit on LLM turns to prevent runaway costs
 
 
+def _make_fallbacks(primary_strategy: str, primary_value: str) -> list[dict]:
+    """Generate fallback locator strategies for a primary locator.
+
+    Discovery records these so replay has multiple ways to find an element
+    if the primary locator fails (e.g., after a UI refactor).
+    """
+    fallbacks = []
+    # Always try text as a fallback (human-readable, survives CSS changes)
+    if primary_strategy != "text" and primary_value and len(primary_value) < 60:
+        fallbacks.append({"strategy": "text", "value": primary_value})
+    # Add CSS data-testid fallback if value looks like a testid
+    if primary_strategy not in ("data-testid", "css"):
+        slug = primary_value.lower().replace(" ", "-").replace("_", "-")
+        if slug:
+            fallbacks.append({"strategy": "css", "value": f"[data-testid*='{slug[:30]}']"})
+    # Add aria-label fallback
+    if primary_strategy not in ("aria-label",) and primary_value:
+        fallbacks.append({"strategy": "aria-label", "value": primary_value})
+    return fallbacks[:2]  # limit to 2 fallbacks to keep artifacts concise
+
+
+
+
 class DiscoveryEngine:
     """
     LLM-driven agent that discovers a UI flow and produces an Artifact.
@@ -272,20 +295,30 @@ class DiscoveryEngine:
         evidence_dir: str = "evidence",
         artifact_dir: str = "artifacts",
         headless: bool = False,
+        allow_irreversible: bool = False,
     ):
         self.goal = goal
         self.base_url = base_url.rstrip("/")
         self.evidence_dir = evidence_dir
         self.artifact_dir = artifact_dir
         self.headless = headless
+        self.allow_irreversible = allow_irreversible
 
         self.run_id = str(uuid.uuid4())
         self.logger = RunLogger(self.run_id, "discovery", evidence_dir)
         self.escalator = EscalationManager(self.run_id, goal)
 
+        # Safety enforcement — same as replay, not just prompt instructions
+        policy = Policy.from_env()
+        if allow_irreversible:
+            policy.irreversible_policy = "allow"
+        else:
+            policy.irreversible_policy = "block"
+        self.guardrail = Guardrail(policy)
+
         self._steps: list[Step] = []
-        self._params: dict[str, str] = {}
-        self._outputs: list[str] = []
+        self._param_defs: list = []   # list[ArtifactParam]
+        self._output_defs: list = []  # list[ArtifactOutput]
         self._step_seq = 0
         self._messages: list[dict] = []
 
@@ -304,7 +337,7 @@ class DiscoveryEngine:
         finally:
             await self._browser.stop()
 
-        # Save artifact
+        # Save artifact (validate() called inside store.save())
         store = ArtifactStore(self.artifact_dir)
         path = store.save(artifact)
         self.logger.info(f"Artifact saved: {path}")
@@ -313,11 +346,19 @@ class DiscoveryEngine:
 
     async def _agent_loop(self) -> Artifact:
         """Main LLM → action → observe loop."""
-        # Navigate to base URL first
+        # Navigate to base URL and record as step 1
         await self._browser.navigate(self.base_url)
         self.logger.info(f"Navigated to {self.base_url}")
+        self._step_seq = 1
+        self._steps.append(Step(
+            seq=1,
+            action="navigate",
+            url=self.base_url,
+            description="Initial navigation to base URL",
+        ))
 
         last_error: str = ""
+        completed = False
 
         for turn in range(MAX_STEPS):
             # Perceive
@@ -341,21 +382,33 @@ class DiscoveryEngine:
             # Handle terminal tools
             if tool_name == "mark_done":
                 self.logger.info(f"mark_done: {tool_args.get('summary', '')}")
-                self._outputs = tool_args.get("outputs", [])
-                extra_params = tool_args.get("params", {})
-                self._params.update(extra_params)
+                completed = True
+                # Build typed output and param definitions
+                from agent.artifact import ArtifactParam, ArtifactOutput
+                for out_key in tool_args.get("outputs", []):
+                    self._output_defs.append(ArtifactOutput(key=out_key, type="string"))
+                for p_name, p_type in tool_args.get("params", {}).items():
+                    # Only add if not already declared
+                    existing = [p.name for p in self._param_defs]
+                    if p_name not in existing:
+                        self._param_defs.append(
+                            ArtifactParam(name=p_name, type="string")
+                        )
                 break
 
             if tool_name == "escalate":
-                # During discovery: don't block waiting for a human.
-                # Log the reason and feed it back to the LLM as context to try a different approach.
+                # During discovery: take screenshot, log, feed error back to LLM
                 reason = tool_args.get("reason", "Agent requested escalation")
-                self.logger.info(f"LLM escalated (discovery mode — continuing): {reason}")
+                screenshot = await self._browser.screenshot(
+                    f"escalation_discovery_{self.run_id[:8]}"
+                )
+                self.logger.info(f"LLM escalated (discovery — non-blocking): {reason}")
                 last_error = (
                     f"You called escalate with: '{reason}'. "
                     f"In discovery mode, escalation is not available. "
                     f"Look at the current page carefully and try a different approach — "
-                    f"use extract to pull the balance value, or navigate to a specific URL."
+                    f"use 'extract' to pull the balance value from data-testid='total-balance', "
+                    f"or navigate directly to a specific URL like {self.base_url}/members/M001."
                 )
                 continue
 
@@ -366,15 +419,21 @@ class DiscoveryEngine:
             elif step:
                 self._steps.append(step)
 
-        # Build and return artifact
+        if not completed:
+            raise RuntimeError(
+                f"Discovery reached MAX_STEPS ({MAX_STEPS}) without calling mark_done. "
+                f"No artifact saved — discovery failed."
+            )
+
+        # Build artifact with typed declarations
         from agent.artifact import ArtifactSafety
         artifact = Artifact(
             goal=self.goal,
             surface="web",
             base_url=self.base_url,
             steps=self._steps,
-            params=self._params,
-            outputs=self._outputs,
+            param_defs=self._param_defs,
+            output_defs=self._output_defs,
             discovery_model=f"{self._provider}/{self._model}",
             safety=ArtifactSafety(
                 allowed_domains=[self.base_url.split("://")[-1].split("/")[0]],
@@ -399,12 +458,20 @@ class DiscoveryEngine:
             raise ValueError(f"Provider {self._provider} not yet fully implemented")
 
     async def _call_openai(self, system: str, user_content: str, screenshot_b64: str) -> tuple:
+        # Detect image format — PIL saves as JPEG, raw Playwright as PNG
+        try:
+            import base64 as _b64
+            raw = _b64.b64decode(screenshot_b64[:16])  # check magic bytes
+            img_mime = "image/jpeg" if raw[:2] == b"\xff\xd8" else "image/png"
+        except Exception:
+            img_mime = "image/png"
+
         self._messages.append({
             "role": "user",
             "content": [
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{screenshot_b64}"},
+                    "image_url": {"url": f"data:{img_mime};base64,{screenshot_b64}"},
                 },
                 {"type": "text", "text": user_content},
             ],
@@ -491,52 +558,90 @@ class DiscoveryEngine:
         completion_tokens = response.usage.output_tokens
         return tool_name, tool_args, prompt_tokens, completion_tokens
 
-    async def _execute_and_record(self, tool_name: str, args: dict, current_url: str) -> Optional[Step]:
-        """Execute a tool call and record it as a Step."""
-        self._step_seq += 1
-        seq = self._step_seq
+    async def _execute_and_record(
+        self, tool_name: str, args: dict, current_url: str
+    ) -> tuple[Optional[Step], Optional[str]]:
+        """Execute a tool call, enforce safety, and record it as a Step.
+
+        Returns (step, None) on success, (None, error_str) on failure.
+        Step seq is only incremented on success to avoid gaps.
+        """
         description = args.get("description", "")
-        self.logger.step_start(seq, tool_name, description)
 
         # Screenshot before action for evidence
-        await self._browser.screenshot(f"discovery_step{seq:02d}_before")
+        next_seq = self._step_seq + 1
+        await self._browser.screenshot(f"discovery_step{next_seq:02d}_before")
 
         step = None
         try:
             if tool_name == "navigate":
                 url = args["url"]
+                # Safety check
+                violation = self.guardrail.check_navigate(url)
+                if violation:
+                    return None, f"Safety violation: {violation.detail}"
+                self._step_seq += 1
+                seq = self._step_seq
+                self.logger.step_start(seq, tool_name, description)
                 await self._browser.navigate(url)
-                step = Step(
-                    seq=seq, action="navigate", url=url, description=description
-                )
+                step = Step(seq=seq, action="navigate", url=url, description=description)
 
             elif tool_name == "fill":
+                primary_strategy = args["locator_strategy"]
+                primary_value = args["locator_value"]
+                # Auto-generate fallbacks for robustness
+                fallbacks = _make_fallbacks(primary_strategy, primary_value)
                 loc = Locator(
-                    strategy=args["locator_strategy"],
-                    value=args["locator_value"],
+                    strategy=primary_strategy,
+                    value=primary_value,
+                    fallbacks=fallbacks,
                 )
                 value = args["value"]
                 param_name = args.get("param_name", "")
                 is_param = args.get("is_param", False)
                 if is_param and param_name:
-                    self._params[param_name] = "string"
-                    value = f"{{{{{param_name}}}}}"
-                safe_value = redact_step_value(value)
-                await self._browser.fill(loc, args["value"])  # use original for actual fill
+                    from agent.artifact import ArtifactParam
+                    existing = [p.name for p in self._param_defs]
+                    if param_name not in existing:
+                        self._param_defs.append(ArtifactParam(name=param_name, type="string"))
+                    # Record parameterized placeholder in artifact
+                    artifact_value = f"{{{{{param_name}}}}}"
+                else:
+                    artifact_value = redact_step_value(value)
+                # Safety check
+                violation, _ = self.guardrail.check_action("fill", current_url, value)
+                if violation:
+                    return None, f"Safety violation: {violation.detail}"
+                self._step_seq += 1
+                seq = self._step_seq
+                self.logger.step_start(seq, tool_name, description)
+                await self._browser.fill(loc, value)  # use original for actual fill
                 step = Step(
-                    seq=seq, action="fill", locator=loc, value=safe_value, description=description
+                    seq=seq, action="fill", locator=loc, value=artifact_value,
+                    description=description + (f" [param:{param_name}]" if is_param else ""),
                 )
 
             elif tool_name == "click":
+                primary_strategy = args["locator_strategy"]
+                primary_value = args["locator_value"]
+                fallbacks = _make_fallbacks(primary_strategy, primary_value)
                 loc = Locator(
-                    strategy=args["locator_strategy"],
-                    value=args["locator_value"],
+                    strategy=primary_strategy,
+                    value=primary_value,
                     name=args.get("locator_name"),
+                    fallbacks=fallbacks,
                 )
+                # Safety check
+                violation, reversibility = self.guardrail.check_action("click", current_url, primary_value)
+                if violation and (reversibility == "write-irreversible" and not self.allow_irreversible):
+                    return None, f"Safety violation: {violation.detail}"
+                self._step_seq += 1
+                seq = self._step_seq
+                self.logger.step_start(seq, tool_name, description)
+                await self._browser.click(loc)
                 checkpoint = None
                 cp_type = args.get("checkpoint_type", "none")
                 cp_value = args.get("checkpoint_value", "")
-                await self._browser.click(loc)
                 if cp_type and cp_type != "none" and cp_value:
                     from agent.artifact import Checkpoint
                     if cp_type == "url_contains":
@@ -553,7 +658,9 @@ class DiscoveryEngine:
                         if ok:
                             self.logger.checkpoint_ok(seq, checkpoint.type)
                         else:
+                            # Log as failure but continue — LLM may recover
                             self.logger.checkpoint_fail(seq, checkpoint.type, detail)
+                            checkpoint = None  # don't persist a known-failing checkpoint
                 step = Step(
                     seq=seq, action="click", locator=loc, checkpoint=checkpoint,
                     description=description
@@ -561,6 +668,9 @@ class DiscoveryEngine:
 
             elif tool_name == "select":
                 loc = Locator(strategy=args["locator_strategy"], value=args["locator_value"])
+                self._step_seq += 1
+                seq = self._step_seq
+                self.logger.step_start(seq, tool_name, description)
                 await self._browser.select_option(loc, args["value"])
                 step = Step(
                     seq=seq, action="select", locator=loc, value=args["value"],
@@ -568,10 +678,22 @@ class DiscoveryEngine:
                 )
 
             elif tool_name == "extract":
-                loc = Locator(strategy=args["locator_strategy"], value=args["locator_value"])
+                primary_strategy = args["locator_strategy"]
+                primary_value = args["locator_value"]
+                fallbacks = _make_fallbacks(primary_strategy, primary_value)
+                loc = Locator(
+                    strategy=primary_strategy, value=primary_value, fallbacks=fallbacks
+                )
+                self._step_seq += 1
+                seq = self._step_seq
+                self.logger.step_start(seq, tool_name, description)
                 text = await self._browser.extract_text(loc)
                 output_key = args["output_key"]
                 self.logger.info(f"Extracted '{output_key}': {text[:80]}")
+                from agent.artifact import ArtifactOutput
+                existing_keys = [o.key for o in self._output_defs]
+                if output_key not in existing_keys:
+                    self._output_defs.append(ArtifactOutput(key=output_key, type="string"))
                 step = Step(
                     seq=seq, action="extract", locator=loc, output_key=output_key,
                     description=description
@@ -579,15 +701,23 @@ class DiscoveryEngine:
 
             elif tool_name == "wait":
                 ms = args.get("ms", 1000)
+                self._step_seq += 1
+                seq = self._step_seq
+                self.logger.step_start(seq, tool_name, description)
                 await self._browser.wait(ms)
                 step = Step(seq=seq, action="wait", wait_ms=ms, description=description)
 
-            self.logger.step_ok(seq, tool_name)
+            else:
+                return None, f"Unknown tool: {tool_name}"
+
+            self.logger.step_ok(self._step_seq, tool_name)
 
         except Exception as e:
-            screenshot = await self._browser.screenshot(f"discovery_error_step{seq:02d}")
+            screenshot = await self._browser.screenshot(
+                f"discovery_error_step{next_seq:02d}"
+            )
             err_str = str(e)
-            self.logger.step_fail(seq, tool_name, err_str, screenshot)
+            self.logger.step_fail(next_seq, tool_name, err_str, screenshot)
             # Return error to caller — LLM will get the error as context and retry
             return None, err_str
 

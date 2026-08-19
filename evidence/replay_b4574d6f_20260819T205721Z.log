@@ -1,0 +1,21 @@
+{"event": "run_start", "run_id": "b4574d6f-dc06-418d-910c-fe8c91cc0bcb", "run_type": "replay", "timestamp": "2026-08-19T20:57:21.429295+00:00"}
+{"event": "info", "message": "Replaying artifact: 3bdd39fe-5940-4829-83a2-9f2e56516807", "timestamp": "2026-08-19T20:57:21.431990+00:00"}
+{"event": "info", "message": "Goal: Find member {{member_name}} and return their account balance", "timestamp": "2026-08-19T20:57:21.432188+00:00"}
+{"event": "info", "message": "Params: {'member_name': 'Jane'}", "timestamp": "2026-08-19T20:57:21.432392+00:00"}
+{"event": "info", "message": "Steps: 6", "timestamp": "2026-08-19T20:57:21.432541+00:00"}
+{"event": "step_start", "seq": 1, "action": "navigate", "description": "Initial navigation to base URL", "elapsed_s": 0.635, "timestamp": "2026-08-19T20:57:22.064189+00:00"}
+{"event": "step_ok", "seq": 1, "action": "navigate", "details": {}, "elapsed_s": 0.653, "timestamp": "2026-08-19T20:57:22.082422+00:00"}
+{"event": "step_start", "seq": 2, "action": "navigate", "description": "Navigate to member search page", "elapsed_s": 0.653, "timestamp": "2026-08-19T20:57:22.082758+00:00"}
+{"event": "checkpoint_ok", "seq": 2, "checkpoint_type": "url_contains", "elapsed_s": 0.671, "timestamp": "2026-08-19T20:57:22.100408+00:00"}
+{"event": "step_ok", "seq": 2, "action": "navigate", "details": {}, "elapsed_s": 0.672, "timestamp": "2026-08-19T20:57:22.101362+00:00"}
+{"event": "step_start", "seq": 3, "action": "fill", "description": "Fill member name into search field [param:member_name]", "elapsed_s": 0.672, "timestamp": "2026-08-19T20:57:22.101747+00:00"}
+{"event": "step_ok", "seq": 3, "action": "fill", "details": {}, "elapsed_s": 0.714, "timestamp": "2026-08-19T20:57:22.143165+00:00"}
+{"event": "step_start", "seq": 4, "action": "click", "description": "Click Search button to submit the form", "elapsed_s": 0.714, "timestamp": "2026-08-19T20:57:22.143537+00:00"}
+{"event": "checkpoint_ok", "seq": 4, "checkpoint_type": "url_contains", "elapsed_s": 0.836, "timestamp": "2026-08-19T20:57:22.265625+00:00"}
+{"event": "step_ok", "seq": 4, "action": "click", "details": {}, "elapsed_s": 0.837, "timestamp": "2026-08-19T20:57:22.266315+00:00"}
+{"event": "step_start", "seq": 5, "action": "click", "description": "Click View Details for the first search result", "elapsed_s": 0.837, "timestamp": "2026-08-19T20:57:22.266560+00:00"}
+{"event": "checkpoint_ok", "seq": 5, "checkpoint_type": "url_contains", "elapsed_s": 0.877, "timestamp": "2026-08-19T20:57:22.305908+00:00"}
+{"event": "step_ok", "seq": 5, "action": "click", "details": {}, "elapsed_s": 0.877, "timestamp": "2026-08-19T20:57:22.306262+00:00"}
+{"event": "step_start", "seq": 6, "action": "extract", "description": "Extract total balance from member detail page", "elapsed_s": 0.877, "timestamp": "2026-08-19T20:57:22.306464+00:00"}
+{"event": "step_ok", "seq": 6, "action": "extract", "details": {}, "elapsed_s": 0.898, "timestamp": "2026-08-19T20:57:22.326899+00:00"}
+{"event": "run_end", "status": "success", "result": {"status": "success", "outputs": {"account_balance": "Total Balance: $17163.50"}, "business_outcome_signal": "", "error_step": null, "error_detail": "", "screenshot_path": "", "log_path": "evidence/replay_b4574d6f_20260819T205721Z.log"}, "elapsed_s": 0.917, "timestamp": "2026-08-19T20:57:22.346412+00:00"}
