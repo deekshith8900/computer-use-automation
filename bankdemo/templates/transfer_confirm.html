@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <h1>Confirm Transfer</h1>
+  <p class="warning-text">⚠️ Please review carefully. This action is <strong>irreversible</strong>.</p>
+</section>
+
+<div class="confirm-card" data-testid="transfer-confirmation" aria-label="Transfer confirmation details">
+  <div class="confirm-row">
+    <span class="confirm-label">From Account</span>
+    <span class="confirm-value" data-testid="confirm-from">{{ from_account.id }} ({{ from_account.type }})</span>
+  </div>
+  <div class="confirm-row">
+    <span class="confirm-label">To Account</span>
+    <span class="confirm-value" data-testid="confirm-to">{{ to_account.id }} ({{ to_account.type }})</span>
+  </div>
+  <div class="confirm-row confirm-row-highlight">
+    <span class="confirm-label">Amount</span>
+    <span class="confirm-amount" data-testid="confirm-amount">${{ "%.2f"|format(amount) }} USD</span>
+  </div>
+  <div class="confirm-row">
+    <span class="confirm-label">Remaining Balance (after)</span>
+    <span class="confirm-value" data-testid="confirm-remaining">
+      ${{ "%.2f"|format(from_account.balance - amount) }} USD
+    </span>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('transfer') }}" data-testid="transfer-confirm-form" aria-label="Confirm transfer form">
+  <input type="hidden" name="step" value="execute"/>
+  <input type="hidden" name="from_account_id" value="{{ from_account.id }}"/>
+  <input type="hidden" name="to_account_id" value="{{ to_account.id }}"/>
+  <input type="hidden" name="amount" value="{{ amount }}"/>
+
+  <div class="form-actions confirm-actions">
+    <button type="submit" class="btn btn-danger" data-testid="btn-confirm-transfer" aria-label="Confirm and execute transfer">
+      ✅ Confirm Transfer
+    </button>
+    <a href="{{ url_for('transfer') }}" class="btn btn-secondary" data-testid="btn-cancel-transfer" aria-label="Cancel and go back">
+      ✕ Cancel
+    </a>
+  </div>
+</form>
+{% endblock %}

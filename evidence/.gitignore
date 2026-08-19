@@ -1,0 +1,3 @@
+# Keep this directory in git, but not its contents
+*.log
+*.png

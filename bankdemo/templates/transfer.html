@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <h1>Fund Transfer</h1>
+  <p>Transfer funds between accounts. This action is <strong>irreversible</strong> once confirmed.</p>
+</section>
+
+{% if success %}
+<div class="alert alert-success" role="alert" data-testid="transfer-success" aria-live="polite">
+  ✅ {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error" role="alert" data-testid="transfer-error" aria-live="assertive">
+  ❌ {{ error }}
+</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('transfer') }}" aria-label="Fund transfer form" data-testid="transfer-form" class="form-card">
+  <input type="hidden" name="step" value="confirm"/>
+
+  <div class="form-group">
+    <label for="from_account" aria-label="Source account">From Account</label>
+    <select id="from_account" name="from_account" data-testid="select-from-account" aria-label="Select source account" required class="form-select">
+      <option value="">— Select source account —</option>
+      {% for account in accounts %}
+      <option value="{{ account.id }}">
+        {{ account.id }} — {{ account.type }} (${{ "%.2f"|format(account.balance) }})
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="to_account" aria-label="Destination account">To Account</label>
+    <select id="to_account" name="to_account" data-testid="select-to-account" aria-label="Select destination account" required class="form-select">
+      <option value="">— Select destination account —</option>
+      {% for account in accounts %}
+      <option value="{{ account.id }}">
+        {{ account.id }} — {{ account.type }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="amount" aria-label="Transfer amount">Amount (USD)</label>
+    <input
+      type="number"
+      id="amount"
+      name="amount"
+      step="0.01"
+      min="0.01"
+      placeholder="0.00"
+      aria-label="Transfer amount in USD"
+      data-testid="input-amount"
+      required
+      class="form-input"
+    />
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary" data-testid="btn-review-transfer" aria-label="Review transfer">
+      Review Transfer →
+    </button>
+  </div>
+</form>
+
+<div class="info-box">
+  <h3>⚠️ Important Notes</h3>
+  <ul>
+    <li>Transfers are <strong>irreversible</strong> once confirmed.</li>
+    <li>Insufficient funds will be rejected at the confirmation step.</li>
+    <li>Same-account transfers are not permitted.</li>
+  </ul>
+</div>
+{% endblock %}

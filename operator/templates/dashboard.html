@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Operator Dashboard — Automation HITL</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2d3250;
+          --primary:#4f8ef7;--danger:#e85d5d;--success:#4ade80;--warning:#fbbf24;
+          --text:#e8eaf0;--muted:#8892a4;--mono:'JetBrains Mono',monospace;}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:58px;
+            background:var(--surface);border-bottom:1px solid var(--border);}
+    .topbar-title{font-weight:700;font-size:1rem;color:var(--primary)}
+    .topbar-badge{background:var(--danger);color:#fff;border-radius:99px;padding:2px 10px;font-size:0.75rem;font-weight:700}
+    .main{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+    h1{font-size:1.4rem;margin-bottom:0.5rem}
+    h2{font-size:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:.8rem;
+       margin-bottom:1rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+    .section{margin-bottom:2.5rem}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1rem}
+    .card-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap}
+    .badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.75rem;font-weight:600}
+    .badge-pending{background:rgba(251,191,36,.15);color:var(--warning);border:1px solid rgba(251,191,36,.3)}
+    .badge-resolved{background:rgba(74,222,128,.15);color:var(--success);border:1px solid rgba(74,222,128,.3)}
+    .card-id{font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+    .card-goal{font-size:.9rem;color:var(--muted);font-style:italic}
+    .reason-box{background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:6px;
+                padding:.7rem 1rem;margin-bottom:.75rem}
+    .reason-box strong{color:var(--warning);font-size:.8rem;display:block;margin-bottom:.25rem}
+    .reason-box p{font-size:.875rem}
+    .meta-row{display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.75rem;font-size:.8rem;color:var(--muted)}
+    .meta-row span{font-family:var(--mono);color:var(--text)}
+    .actions{display:flex;gap:.6rem;margin-top:.75rem}
+    .btn{display:inline-flex;align-items:center;gap:.35rem;padding:.5rem 1rem;border-radius:6px;
+         font-size:.875rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;font-family:'Inter',sans-serif;
+         transition:background .15s,transform .15s}
+    .btn:active{transform:scale(.97)}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-primary:hover{background:#3b7ae4}
+    .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+    .btn-secondary:hover{background:var(--border)}
+    .empty{text-align:center;padding:2.5rem;color:var(--muted);background:var(--surface);
+           border:1px dashed var(--border);border-radius:10px}
+    .empty-icon{font-size:2.5rem;margin-bottom:.75rem}
+    footer{text-align:center;padding:1rem;font-size:.72rem;color:var(--muted);border-top:1px solid var(--border);margin-top:3rem}
+    .auto-refresh{font-size:.7rem;color:var(--muted);margin-left:auto}
+  </style>
+  <meta http-equiv="refresh" content="5">
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-title">🛡 Operator Dashboard</div>
+  {% if pending %}
+  <span class="topbar-badge">{{ pending|length }} pending</span>
+  {% endif %}
+  <span class="auto-refresh">Auto-refresh every 5s</span>
+</nav>
+<main class="main">
+  <div class="section">
+    <h2>Pending Interventions</h2>
+    {% if pending %}
+      {% for req in pending %}
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-pending">⚑ PENDING</span>
+          <span class="card-id">{{ req.id[:16] }}…</span>
+          <span class="card-goal">{{ req.artifact_goal[:60] }}</span>
+        </div>
+        <div class="reason-box">
+          <strong>Reason for escalation:</strong>
+          <p>{{ req.reason }}</p>
+        </div>
+        <div class="meta-row">
+          Step: <span>{{ req.current_step_seq }}</span>
+          URL: <span>{{ req.current_url[:60] }}</span>
+          At: <span>{{ req.created_at[:19] }}</span>
+        </div>
+        {% if req.screenshot_path %}
+        <p style="font-size:.8rem;color:var(--muted);margin-bottom:.5rem">
+          Screenshot: <code style="color:var(--primary)">{{ req.screenshot_path }}</code>
+        </p>
+        {% endif %}
+        <div class="actions">
+          <a href="/interventions/{{ req.id }}" class="btn btn-secondary">🔍 View Details</a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        <div class="empty-icon">✅</div>
+        <p>No pending interventions. Automation is running normally.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Recently Resolved</h2>
+    {% if resolved %}
+      {% for req in resolved %}
+      <div class="card" style="opacity:.65">
+        <div class="card-header">
+          <span class="badge badge-resolved">✓ RESOLVED</span>
+          <span class="card-id">{{ req.id[:16] }}…</span>
+          <span class="card-goal">{{ req.artifact_goal[:60] }}</span>
+        </div>
+        <div class="meta-row">
+          Resolved: <span>{{ req.resolved_at[:19] if req.resolved_at else '—' }}</span>
+          Notes: <span>{{ req.human_notes or '(none)' }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--muted);font-size:.875rem">No resolved interventions yet.</p>
+    {% endif %}
+  </div>
+</main>
+<footer>Operator Dashboard — Computer-Use Automation System</footer>
+</body>
+</html>

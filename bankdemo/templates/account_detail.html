@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <div class="breadcrumb">
+    <a href="{{ url_for('members') }}">Members</a> ›
+    <a href="{{ url_for('member_detail', member_id=owner.id) }}">{{ owner.name }}</a> ›
+    {{ account.id }}
+  </div>
+  <h1 data-testid="account-id">{{ account.id }}</h1>
+  <p>{{ account.type }} Account</p>
+</section>
+
+<div class="detail-grid">
+  <section class="detail-card" aria-label="Account details">
+    <h2>Account Details</h2>
+    <dl class="detail-list">
+      <dt>Account ID</dt>
+      <dd data-testid="detail-account-id">{{ account.id }}</dd>
+      <dt>Type</dt>
+      <dd data-testid="detail-account-type">{{ account.type }}</dd>
+      <dt>Owner</dt>
+      <dd data-testid="detail-account-owner">{{ owner.name }} ({{ owner.id }})</dd>
+      <dt>Current Balance</dt>
+      <dd class="balance-large" data-testid="current-balance" aria-label="Current balance">
+        ${{ "%.2f"|format(account.balance) }} {{ account.currency }}
+      </dd>
+    </dl>
+  </section>
+
+  <section class="detail-card" aria-label="Recent transactions">
+    <h2>Recent Transactions</h2>
+    {% if transactions %}
+      <div class="table-wrapper">
+        <table class="data-table" data-testid="transactions-table">
+          <thead>
+            <tr>
+              <th>Transaction ID</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Amount</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in transactions %}
+            <tr data-testid="txn-{{ txn.id }}">
+              <td>{{ txn.id }}</td>
+              <td>{{ txn.from_account }}</td>
+              <td>{{ txn.to_account }}</td>
+              <td class="{{ 'debit' if txn.from_account == account.id else 'credit' }}">
+                {{ '-' if txn.from_account == account.id else '+' }}${{ "%.2f"|format(txn.amount) }}
+              </td>
+              <td>{{ txn.timestamp }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state-sm" data-testid="no-transactions">No transactions on record.</p>
+    {% endif %}
+  </section>
+</div>
+
+<div class="page-actions">
+  <a href="{{ url_for('transfer') }}" class="btn btn-primary" data-testid="btn-transfer">💸 Transfer Funds</a>
+  <a href="{{ url_for('member_detail', member_id=owner.id) }}" class="btn btn-secondary" data-testid="btn-back-member">← Back to Member</a>
+</div>
+{% endblock %}

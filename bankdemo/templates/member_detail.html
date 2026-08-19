@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <div class="breadcrumb" aria-label="Breadcrumb">
+    <a href="{{ url_for('members') }}">Members</a> › {{ member.name }}
+  </div>
+  <h1 data-testid="member-name">{{ member.name }}</h1>
+  <p class="member-id" data-testid="member-id">Member ID: {{ member.id }}</p>
+</section>
+
+<div class="detail-grid">
+  <!-- Contact Info -->
+  <section class="detail-card" aria-label="Contact information">
+    <h2>Contact Information</h2>
+    <dl class="detail-list">
+      <dt>Full Name</dt>
+      <dd data-testid="detail-name">{{ member.name }}</dd>
+      <dt>Email</dt>
+      <dd data-testid="detail-email">{{ member.email }}</dd>
+      <dt>Phone</dt>
+      <dd data-testid="detail-phone">{{ member.phone }}</dd>
+      <dt>Member ID</dt>
+      <dd data-testid="detail-member-id">{{ member.id }}</dd>
+    </dl>
+  </section>
+
+  <!-- Accounts -->
+  <section class="detail-card" aria-label="Accounts">
+    <h2>Accounts</h2>
+    {% if accounts %}
+      <div class="account-list" data-testid="accounts-list">
+        {% for account in accounts %}
+        <div class="account-item" data-testid="account-{{ account.id }}">
+          <div class="account-info">
+            <span class="account-type">{{ account.type }}</span>
+            <span class="account-id">{{ account.id }}</span>
+          </div>
+          <div class="account-balance" data-testid="balance-{{ account.id }}" aria-label="Balance for {{ account.id }}">
+            ${{ "%.2f"|format(account.balance) }} <span class="currency">{{ account.currency }}</span>
+          </div>
+          <a href="{{ url_for('account_detail', account_id=account.id) }}"
+             class="btn btn-sm btn-secondary"
+             data-testid="view-account-{{ account.id }}"
+             aria-label="View account {{ account.id }}">
+            View Account
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="total-balance" data-testid="total-balance">
+        Total Balance: <strong>${{ "%.2f"|format(accounts|sum(attribute='balance')) }}</strong>
+      </div>
+    {% else %}
+      <p class="empty-state-sm">No accounts found for this member.</p>
+    {% endif %}
+  </section>
+
+  <!-- Loans -->
+  <section class="detail-card" aria-label="Loans">
+    <h2>Loans</h2>
+    {% if loans %}
+      <div class="table-wrapper">
+        <table class="data-table" data-testid="loans-table">
+          <thead>
+            <tr>
+              <th>Loan ID</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Monthly Payment</th>
+              <th>Next Due</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for loan in loans %}
+            <tr data-testid="loan-row-{{ loan.id }}">
+              <td>{{ loan.id }}</td>
+              <td>{{ loan.type }}</td>
+              <td>${{ "{:,.0f}".format(loan.amount) }}</td>
+              <td>
+                <span class="badge badge-{{ 'success' if loan.status == 'Active' else 'neutral' }}"
+                      data-testid="loan-status-{{ loan.id }}">
+                  {{ loan.status }}
+                </span>
+              </td>
+              <td>${{ "%.2f"|format(loan.monthly_payment) }}</td>
+              <td>{{ loan.next_due or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state-sm">No loans on file.</p>
+    {% endif %}
+  </section>
+</div>
+
+<div class="page-actions">
+  <a href="{{ url_for('transfer') }}" class="btn btn-primary" data-testid="btn-transfer" aria-label="Transfer funds for this member">
+    💸 Transfer Funds
+  </a>
+  <a href="{{ url_for('members') }}" class="btn btn-secondary" data-testid="btn-back-search" aria-label="Back to member search">
+    ← Back to Search
+  </a>
+</div>
+{% endblock %}

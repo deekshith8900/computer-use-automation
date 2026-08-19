@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BankDemo — Computer-Use Test Surface</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="nav-brand">
+      <span class="nav-logo">🏦</span>
+      <span class="nav-title">BankDemo</span>
+      <span class="nav-subtitle">Test Surface</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="{{ url_for('index') }}" aria-label="Home">Home</a></li>
+      <li><a href="{{ url_for('members') }}" aria-label="Member Search">Members</a></li>
+      <li><a href="{{ url_for('transfer') }}" aria-label="Fund Transfer">Transfer</a></li>
+      <li><a href="{{ url_for('loans') }}" aria-label="Loan Lookup">Loans</a></li>
+    </ul>
+  </nav>
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <p>BankDemo — Not a real bank. For automation testing only.</p>
+  </footer>
+</body>
+</html>

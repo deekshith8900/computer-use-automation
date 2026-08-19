@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <h1>Member Search</h1>
+  <p>Search for members by name or email address.</p>
+</section>
+
+<section class="search-section">
+  <form method="POST" action="{{ url_for('members') }}" role="search" aria-label="Member search form" data-testid="member-search-form">
+    <div class="search-row">
+      <label for="query" class="sr-only">Search members</label>
+      <input
+        type="text"
+        id="query"
+        name="query"
+        value="{{ query }}"
+        placeholder="Enter name or email..."
+        aria-label="Search members"
+        data-testid="search-input"
+        autocomplete="off"
+        class="search-input"
+      />
+      <button type="submit" class="btn btn-primary" data-testid="search-button" aria-label="Search">
+        🔍 Search
+      </button>
+    </div>
+  </form>
+</section>
+
+{% if searched %}
+<section class="search-results" aria-label="Search results" data-testid="search-results">
+  {% if results %}
+    <h2>{{ results|length }} member{{ 's' if results|length != 1 else '' }} found</h2>
+    <div class="table-wrapper">
+      <table class="data-table" data-testid="results-table">
+        <thead>
+          <tr>
+            <th scope="col">Member ID</th>
+            <th scope="col">Name</th>
+            <th scope="col">Email</th>
+            <th scope="col">Phone</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member in results %}
+          <tr data-testid="member-row-{{ member.id }}">
+            <td>{{ member.id }}</td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.email }}</td>
+            <td>{{ member.phone }}</td>
+            <td>
+              <a
+                href="{{ url_for('member_detail', member_id=member.id) }}"
+                class="btn btn-sm btn-primary"
+                data-testid="view-member-{{ member.id }}"
+                aria-label="View details for {{ member.name }}"
+              >View Details</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state" data-testid="no-results" role="status">
+      <div class="empty-icon">🔍</div>
+      <h2>No members found</h2>
+      <p>No members matched "<strong>{{ query }}</strong>". Try a different name or email.</p>
+    </div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

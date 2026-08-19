@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Secrets — NEVER commit
+.env
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Evidence / run outputs (large, run-specific)
+evidence/*.log
+evidence/*.png
+
+# Browser / Playwright cache
+*.har
+
+# Editor
+.idea/
+.vscode/
+*.swp

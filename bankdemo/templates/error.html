@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="error-page" role="main" aria-label="Error page">
+  <div class="error-content">
+    <div class="error-code" data-testid="error-code">{{ code }}</div>
+    <h1 class="error-title">{{ 'Not Found' if code == 404 else 'Error' }}</h1>
+    <p class="error-message" data-testid="error-message">{{ message }}</p>
+    <div class="error-actions">
+      <a href="{{ url_for('index') }}" class="btn btn-primary" data-testid="btn-home">← Return Home</a>
+      <a href="{{ url_for('members') }}" class="btn btn-secondary" data-testid="btn-search">Search Members</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

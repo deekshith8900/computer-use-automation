@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero" aria-label="Welcome">
+  <div class="hero-content">
+    <h1 class="hero-title">BankDemo</h1>
+    <p class="hero-subtitle">A realistic banking UI test surface for computer-use automation experiments.</p>
+    <p class="hero-note">⚠️ This is not a real bank. All data is fictional and seeded in memory.</p>
+    <div class="hero-actions">
+      <a href="{{ url_for('members') }}" class="btn btn-primary" data-testid="btn-member-search" aria-label="Search for members">
+        🔍 Search Members
+      </a>
+      <a href="{{ url_for('transfer') }}" class="btn btn-secondary" data-testid="btn-transfer" aria-label="Transfer funds">
+        💸 Fund Transfer
+      </a>
+      <a href="{{ url_for('loans') }}" class="btn btn-secondary" data-testid="btn-loans" aria-label="Loan lookup">
+        📋 Loan Lookup
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="features" aria-label="Available features">
+  <h2>Available Flows</h2>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon">👤</div>
+      <h3>Member Search</h3>
+      <p>Search members by name or email. View account details, balances, and loan history.</p>
+      <code>Multi-step: search → select → detail</code>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💳</div>
+      <h3>Fund Transfer</h3>
+      <p>Transfer funds between accounts with a multi-field form and confirmation step.</p>
+      <code>Multi-step: form → confirm → execute</code>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏛️</div>
+      <h3>Loan Lookup</h3>
+      <p>Look up loan status by application ID. Handles not-found and paid-off states.</p>
+      <code>Single-step: lookup → result</code>
+    </div>
+  </div>
+</section>
+
+<section class="seed-data" aria-label="Test data reference">
+  <h2>Seeded Test Data</h2>
+  <div class="table-wrapper">
+    <table class="data-table" data-testid="seed-data-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Member ID</th>
+          <th>Accounts</th>
+          <th>Loans</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Jane Doe</td><td>M001</td><td>ACC-1001 (Checking $4,823.50), ACC-1002 (Savings $12,340)</td><td>LN-2024-001</td></tr>
+        <tr><td>John Smith</td><td>M002</td><td>ACC-2001 (Checking $892.75)</td><td>LN-2024-002</td></tr>
+        <tr><td>Alice Johnson</td><td>M003</td><td>ACC-3001 (Checking $15,000), ACC-3002 (Savings $50,000)</td><td>—</td></tr>
+        <tr><td>Bob Williams</td><td>M004</td><td>ACC-4001 (Checking $125.00)</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <h1>Loan Lookup</h1>
+  <p>Look up a loan application by its ID.</p>
+</section>
+
+<form method="POST" action="{{ url_for('loans') }}" aria-label="Loan lookup form" data-testid="loan-lookup-form" class="form-card">
+  <div class="form-group">
+    <label for="loan_id" aria-label="Loan application ID">Loan Application ID</label>
+    <input
+      type="text"
+      id="loan_id"
+      name="loan_id"
+      value="{{ query }}"
+      placeholder="e.g. LN-2024-001"
+      aria-label="Loan application ID"
+      data-testid="input-loan-id"
+      autocomplete="off"
+      class="form-input"
+    />
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary" data-testid="btn-lookup-loan" aria-label="Look up loan">
+      🔍 Look Up
+    </button>
+  </div>
+</form>
+
+{% if error %}
+<div class="alert alert-error" role="alert" data-testid="loan-error" aria-live="assertive">
+  ❌ {{ error }}
+</div>
+{% endif %}
+
+{% if result %}
+<section class="loan-result" data-testid="loan-result" aria-label="Loan details">
+  <h2>Loan Details</h2>
+  <div class="detail-card">
+    <dl class="detail-list">
+      <dt>Loan ID</dt>
+      <dd data-testid="loan-id">{{ result.id }}</dd>
+      <dt>Type</dt>
+      <dd data-testid="loan-type">{{ result.type }}</dd>
+      <dt>Original Amount</dt>
+      <dd data-testid="loan-amount">${{ "{:,.0f}".format(result.amount) }}</dd>
+      <dt>Status</dt>
+      <dd>
+        <span class="badge badge-{{ 'success' if result.status == 'Active' else 'neutral' }}"
+              data-testid="loan-status">
+          {{ result.status }}
+        </span>
+      </dd>
+      <dt>Monthly Payment</dt>
+      <dd data-testid="loan-monthly">${{ "%.2f"|format(result.monthly_payment) }}</dd>
+      <dt>Next Due Date</dt>
+      <dd data-testid="loan-due">{{ result.next_due or 'N/A — Paid Off' }}</dd>
+    </dl>
+  </div>
+</section>
+{% endif %}
+
+<div class="info-box">
+  <h3>Available Loan IDs (test data)</h3>
+  <ul>
+    <li><code>LN-2024-001</code> — Jane Doe, Mortgage, Active</li>
+    <li><code>LN-2024-002</code> — John Smith, Auto, Active</li>
+    <li><code>LN-2024-003</code> — Alice Johnson, Personal, Paid Off</li>
+  </ul>
+</div>
+{% endblock %}
